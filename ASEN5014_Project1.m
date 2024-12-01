@@ -66,7 +66,7 @@ eig_labels = {'IC: [1 0 0 0 0 0]', 'IC: [0 1 0 0 0 0]', 'IC: [0 0 1 0 0 0]', ...
 
 for i = 1:6
     x0{i} = Eig_vec(:,i);
-    t = [0:dt:10]';
+    t = [0:dt:75]';
     u = ones(length(t),1).*[0,0,0];
     [yout{i},tout{i}] = lsim(ss_system,u,t,x0{i});
 
@@ -156,7 +156,7 @@ plot_2 = 0;
 
 for i = 1:6
     x0{i} = Q(:,i);
-    t = [0:0.01:10]';
+    t = [0:0.01:75]';
     u = u_t{i};
     [yout{i},tout{i}] = lsim(ss_system,u,t,x0{i});
 
@@ -353,7 +353,7 @@ for i = 1:6
         title(sprintf('Initial Condition %d', i))
         xlabel('Time (s)')
         ylabel('Control Torque (N⋅m)')
-        legend('FB 1', 'FB τ2', 'FB τ3', 'OL τ1', 'OL τ2', 'OL τ3')
+        legend('FB τ1', 'FB τ2', 'FB τ3', 'OL τ1', 'OL τ2', 'OL τ3')
         grid on
     end
 end
@@ -428,4 +428,44 @@ if plot_4 == 1
 
     % save figure
     saveas(gcf, '../figures/problem4_modal_response.png')
+end
+
+% Calculate energies for each mode
+mode_names = {'ω1', 'ω2', 'ω3', 'q1', 'q2', 'q3'};
+energies = struct();
+
+% Calculate controllability Gramian W
+W = zeros(6,6);
+for i = 1:length(t)
+    W = W + dt*(expm(A*(-t(i)))*B*B'*expm(A'*(-t(i))));
+end
+
+% Calculate energies for each mode
+for i = 1:6
+    x0 = Q(:,i);  % Initial condition from orthonormal basis
+    
+    % Theoretical open loop minimum energy
+    zeta = expm(-A*(t(end)-t(1)))*zeros(6,1) - x0;
+    energies.theoretical(i) = zeta'*inv(W)*zeta;
+    
+    % Actual feedback energy used
+    energies.feedback(i) = trapz(t, sum(u_cl_all{i}.^2, 1));
+end
+
+% Create simple bar plot comparing energies
+figure('Name', 'Control Energy Comparison', 'Position', [100 100 800 400]);
+bar([energies.theoretical; energies.feedback]');
+set(gca, 'YScale', 'log');
+set(gca, 'XTickLabel', mode_names);
+xlabel('Mode');
+ylabel('Control Energy (N⋅m)²⋅s');
+legend('Open Loop Minimum', 'Feedback');
+title('Control Energy Comparison by Mode');
+grid on;
+
+% Print key findings
+fprintf('\nControl Energy Comparison:\n');
+for i = 1:6
+    fprintf('%s: Feedback uses %.1fx minimum energy\n', ...
+        mode_names{i}, energies.feedback(i)/energies.theoretical(i));
 end
