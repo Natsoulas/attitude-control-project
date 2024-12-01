@@ -251,11 +251,6 @@ Co = ctrb(A, B);
 rank_Co = rank(Co);
 fprintf('Controllability matrix rank: %d\n', rank_Co);
 
-% Get natural modes of the system
-[V_nat, D_nat] = eig(A);
-[~, idx] = sort(real(diag(D_nat)));  % Sort by real part
-V_nat = V_nat(:,idx);
-
 % Try pole placement with ordered poles
 K = place(A, B, desired_eigs);
 
