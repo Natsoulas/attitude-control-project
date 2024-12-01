@@ -13,16 +13,55 @@ C = eye(6,6);
 D = zeros(6,3);
 
 %% Problem 1
-%eigvecs and eigvals
+%eigvectors and eigvalues
 [Eig_vec,Eig_val] = eigs(A);
 Eig_vec = [Eig_vec(:,1:3),[0;0;0;2;0;0],[0;0;0;0;2;0],[0;0;0;0;0;2]];
 
 %problem 1 plot parameter
-plot_1 = 0;
+plot_1 = 1;
 
 %setup initial conditions and system response
 dt = 0.01;
 ss_system = ss(A,B,C,D);
+
+% Full System Stability Analysis with Jordan Form
+% Check eigenvalues
+[V, D] = eig(A);
+disp('Eigenvalues:');
+disp(diag(D));
+
+% Analyze Jordan form
+[Vj, J] = jordan(A);
+disp('Jordan Form:');
+disp(J);
+
+disp('Vj:');
+disp(Vj);
+
+% Exponential solution (if needed)
+syms t
+Phi = expm(A*t); % Matrix exponential
+disp('State Transition Matrix (Phi):');
+disp(Phi);
+
+
+if plot_1 == 1
+    % Create figures directory if it doesn't exist
+    if ~exist('../figures', 'dir')
+        mkdir('../figures');
+    end
+
+    % Create two figures - one for quaternions, one for angular velocities
+    figure('Position', [100 100 1200 800])
+    sgtitle('Quaternion Components for All Eigenvector Initial Conditions')
+    figure('Position', [100 100 1200 800])
+    sgtitle('Angular Velocity Components for All Eigenvector Initial Conditions')
+end
+
+% Create descriptive labels for each eigenvector
+eig_labels = {'IC: [1 0 0 0 0 0]', 'IC: [0 1 0 0 0 0]', 'IC: [0 0 1 0 0 0]', ...
+              'IC: [0 0 0 2 0 0]', 'IC: [0 0 0 0 2 0]', 'IC: [0 0 0 0 0 2]'};
+
 for i = 1:6
     x0{i} = Eig_vec(:,i);
     t = [0:dt:10]';
@@ -31,36 +70,50 @@ for i = 1:6
 
     if plot_1 == 1
         %quaternion component plots
-        figure()
-        subplot(3,1,1)
+        figure(1)
+        subplot(6,3,(i-1)*3+1)
         plot(tout{i},yout{i}(:,1),'r')
-        xlabel('time')
         ylabel('q1')
-        title('Quaternion Components')
-        subplot(3,1,2)
+        title(eig_labels{i})
+        if i == 6, xlabel('time'), end
+        
+        subplot(6,3,(i-1)*3+2)
         plot(tout{i},yout{i}(:,2),'k')
-        xlabel('time')
         ylabel('q2')
-        subplot(3,1,3)
+        title(eig_labels{i})
+        if i == 6, xlabel('time'), end
+        
+        subplot(6,3,(i-1)*3+3)
         plot(tout{i},yout{i}(:,3),'g')
-        xlabel('time')
         ylabel('q3')
+        title(eig_labels{i})
+        if i == 6, xlabel('time'), end
 
         %angular velocity component plots
-        figure()
-        subplot(3,1,1)
+        figure(2)
+        subplot(6,3,(i-1)*3+1)
         plot(tout{i},yout{i}(:,4),'r')
-        xlabel('time')
-        ylabel('w1')
-        title('Angular Velocity Components')
-        subplot(3,1,2)
+        ylabel('ω1')
+        title(eig_labels{i})
+        if i == 6, xlabel('time'), end
+        
+        subplot(6,3,(i-1)*3+2)
         plot(tout{i},yout{i}(:,5),'k')
-        xlabel('time')
-        ylabel('w2')
-        subplot(3,1,3)
+        ylabel('ω2')
+        title(eig_labels{i})
+        if i == 6, xlabel('time'), end
+        
+        subplot(6,3,(i-1)*3+3)
         plot(tout{i},yout{i}(:,6),'g')
-        xlabel('time')
-        ylabel('w3')
+        ylabel('ω3')
+        title(eig_labels{i})
+        if i == 6, xlabel('time'), end
+
+        % Save quaternion figure
+        saveas(gcf, '../figures/problem1_quaternions.png')
+        
+        % Save angular velocity figure
+        saveas(gcf, '../figures/problem1_angular_velocities.png')
     end
 end
 
@@ -72,6 +125,10 @@ U_rank = rank(U);
 
 %orthonormal basis Q for R6
 [Q,R] = qr(Eig_vec);
+
+% print out the orthonormal basis Q
+disp('Orthonormal Basis Q:');
+disp(Q);
 
 %{
 Determine the energy required by the minimum-energy control to restore 
@@ -92,8 +149,8 @@ for i = 1:length(Eig_val)
     end
 end
 
-%problem 1 plot parameter
-plot_2 = 1;
+%problem 2 plot parameter
+plot_2 = 0;
 
 for i = 1:6
     x0{i} = Q(:,i);
