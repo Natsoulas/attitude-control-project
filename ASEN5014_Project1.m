@@ -220,14 +220,7 @@ for i = 1:length(eigenvalues)
 end
 
 % Define desired closed-loop eigenvalues
-desired_eigs = [
-    -0.1;  % Slower mode for q1 (roll angle)
-    -0.1;  % Slower mode for q2 (pitch angle)
-    -0.1;   % Slower mode for q3 (yaw angle)
-    -0.2;  % Fast mode for w1 (roll rate)
-    -0.2;  % Fast mode for w2 (pitch rate)
-    -0.2   % Fast mode for w3 (yaw rate)
-];
+desired_eigs = [-.1 -.1 -.1 -.2 -.2 -.2]';  % First 3 for quaternions (τ=1s), last 3 for rates (τ=0.5s)
 
 % Display time constants
 fprintf('\nTime Constants:\n');
@@ -246,35 +239,40 @@ fprintf('Angular Rates (w1,w2,w3): %.1f seconds\n', -1/desired_eigs(4));
 % control.
 
 % Plot parameter for problem 4
-plot_4 = 1;
+plot_4 = 0;
 
-% Calculate feedback gain matrix K using place command
+% Define desired eigenvalues with slight offsets to avoid multiplicity
+% Order them to have angular velocities first since they are directly controlled, and will naturally appear first.
+% This doesn't change how they relate to states, just represents the order of the modes.
+desired_eigs = [-0.2 -0.201 -0.2001 -0.1 -0.1001 -0.1004]';  % Rates first, then quaternions
+
+% Compute controllability matrix and verify rank
+Co = ctrb(A, B);
+rank_Co = rank(Co);
+fprintf('Controllability matrix rank: %d\n', rank_Co);
+
+% Get natural modes of the system
+[V_nat, D_nat] = eig(A);
+[~, idx] = sort(real(diag(D_nat)));  % Sort by real part
+V_nat = V_nat(:,idx);
+
+% Try pole placement with ordered poles
 K = place(A, B, desired_eigs);
 
 % Create closed-loop system
 Acl = A - B*K;
 sys_cl = ss(Acl, B, C, D);
 
-% Find closed-loop eigenstructure
+% Verify eigenvalues and eigenvectors
 [V_cl, D_cl] = eig(Acl);
-eigenvalues_cl = diag(D_cl);
+[eigs, idx] = sort(diag(D_cl), 'ComparisonMethod', 'real');  % Sort by real part
+V_cl = V_cl(:,idx);
 
-% Normalize eigenvectors to get modal matrix
-M_cl = zeros(size(V_cl));
-for i = 1:size(V_cl,2)
-    M_cl(:,i) = V_cl(:,i) / norm(V_cl(:,i));
-end
-
-% Display closed-loop eigenvalues and modal matrix
-disp('Closed-loop eigenvalues:');
-disp(eigenvalues_cl);
-disp('Closed-loop eigenvectors:');
-disp(V_cl);
-disp('Closed-loop modal matrix:');
-disp(M_cl);
+fprintf('\nFinal closed-loop eigenvalues:\n')
+disp(eigs)
 
 % Time vector for simulation
-t = 0:0.01:100;
+t = 0:0.001:75;
 
 % Initialize plots
 if plot_4 == 1
@@ -360,7 +358,7 @@ for i = 1:6
         title(sprintf('Initial Condition %d', i))
         xlabel('Time (s)')
         ylabel('Control Torque (N⋅m)')
-        legend('FB τ1', 'FB τ2', 'FB τ3', 'OL τ1', 'OL τ2', 'OL τ3')
+        legend('FB 1', 'FB τ2', 'FB τ3', 'OL τ1', 'OL τ2', 'OL τ3')
         grid on
     end
 end
@@ -373,4 +371,66 @@ if plot_4 == 1
     saveas(gcf, '../figures/problem4_angular_velocities.png')
     figure(3)
     saveas(gcf, '../figures/problem4_controls.png')
+end
+
+% First verify pole placement worked
+fprintf('Desired eigenvalues:\n')
+disp(desired_eigs)
+
+% Now look at modal responses
+if plot_4 == 1
+    figure('Position', [100 100 1200 600])
+    sgtitle('Modal Response Verification')
+    
+    % Get modal transformation and sort by eigenvalue magnitude
+    [V_cl, D_cl] = eig(Acl);
+    
+    % Initialize storage for modal responses
+    modal_resp = zeros(6, length(t));
+    
+    % For each initial condition
+    for i = 1:6
+        x0 = Q(:,i);
+        z0 = inv(V_cl)*x0;
+        
+        % For each mode, compute response
+        for j = 1:6
+            z = z0(j)*exp(D_cl(j,j)*t);
+            modal_resp(j,:) = max(abs(modal_resp(j,:)), abs(z));
+        end
+    end
+    
+    % Normalize responses
+    for i = 1:6
+        if modal_resp(i,1) > 0
+            modal_resp(i,:) = modal_resp(i,:) / modal_resp(i,1);
+        end
+    end
+    
+    % Plot with distinct colors
+    hold on
+    % Plot quaternion modes
+    for i = 1:3
+        plot(t, modal_resp(i,:), 'Color', [0 0.4470 0.7410], 'LineWidth', 1.5)
+    end
+    % Plot angular rate modes
+    for i = 4:6
+        plot(t, modal_resp(i,:), 'Color', [0.8500 0.3250 0.0980], 'LineWidth', 1.5)
+    end
+    
+    % Plot expected decays
+    plot(t, exp(-0.1*t), 'r--', 'LineWidth', 2)  % τ=10s for quaternions
+    plot(t, exp(-0.2*t), 'k--', 'LineWidth', 2)  % τ=5s for angular rates
+    
+    xlabel('Time (s)')
+    ylabel('Normalized Modal Response Magnitude')
+    legend({'q1 mode', 'q2 mode', 'q3 mode', 'ω1 mode', 'ω2 mode', 'ω3 mode', ...
+            'Expected τ=10s', 'Expected τ=5s'}, 'Location', 'southwest')
+    set(gca, 'YScale', 'log')
+    grid on
+    ylim([0.01 1])
+    xlim([0 max(t)])
+
+    % save figure
+    saveas(gcf, '../figures/problem4_modal_response.png')
 end
