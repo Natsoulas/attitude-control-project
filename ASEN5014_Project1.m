@@ -15,10 +15,13 @@ D = zeros(6,3);
 %% Problem 1
 %eigvectors and eigvalues
 [Eig_vec,Eig_val] = eigs(A);
+
+% Augment the eigvectors with the additional generalized eigenvectors
+% (Matlab can't solve for them so we have to do it manually)
 Eig_vec = [Eig_vec(:,1:3),[0;0;0;2;0;0],[0;0;0;0;2;0],[0;0;0;0;0;2]];
 
 %problem 1 plot parameter
-plot_1 = 1;
+plot_1 = 0;
 
 %setup initial conditions and system response
 dt = 0.01;
@@ -192,3 +195,55 @@ for i = 1:6
         ylabel('w3')
     end
 end
+
+%% Problem 3
+
+% First, let's properly check controllability of each mode using the PBH test
+% PBH Test: For each eigenvalue λ, check rank([λI - A, B]) = n
+
+% Get system eigenvalues
+[V, D] = eig(A);
+eigenvalues = diag(D);
+n = size(A,1);  % system order
+
+fprintf('PBH Test Results:\n');
+for i = 1:length(eigenvalues)
+    lambda = eigenvalues(i);
+    PBH_matrix = [lambda*eye(n) - A, B];
+    PBH_rank = rank(PBH_matrix);
+    fprintf('Mode %d (λ = %.3f): rank = %d (of %d possible)\n', ...
+            i, lambda, PBH_rank, n);
+    if PBH_rank == n
+        fprintf('  → Mode is controllable\n');
+    else
+        fprintf('  → Mode is NOT controllable\n');
+    end
+end
+
+% Define desired closed-loop eigenvalues
+desired_eigs = [
+    -0.1;  % Slower mode for q1 (roll angle)
+    -0.1;  % Slower mode for q2 (pitch angle)
+    -0.1;   % Slower mode for q3 (yaw angle)
+    -0.2;  % Fast mode for w1 (roll rate)
+    -0.2;  % Fast mode for w2 (pitch rate)
+    -0.2   % Fast mode for w3 (yaw rate)
+];
+
+% Display time constants
+fprintf('\nTime Constants:\n');
+fprintf('Quaternions (q1,q2,q3): %.1f seconds\n', -1/desired_eigs(1));
+fprintf('Angular Rates (w1,w2,w3): %.1f seconds\n', -1/desired_eigs(4));
+
+
+%% Problem 4
+% Calculate feedback gain matrix K using place command
+K = place(A, B, desired_eigs);
+
+% Create closed-loop system
+Acl = A - B*K;
+sys_cl = ss(Acl, B, C, D);
+
+% Find closed-loop eigenstructure
+[V_cl, D_cl] = eig(Acl);
+eigenvalues_cl = diag(D_cl);
