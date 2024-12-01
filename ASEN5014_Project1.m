@@ -462,10 +462,3 @@ ylabel('Control Energy (N⋅m)²⋅s');
 legend('Open Loop Minimum', 'Feedback');
 title('Control Energy Comparison by Mode');
 grid on;
-
-% Print key findings
-fprintf('\nControl Energy Comparison:\n');
-for i = 1:6
-    fprintf('%s: Feedback uses %.1fx minimum energy\n', ...
-        mode_names{i}, energies.feedback(i)/energies.theoretical(i));
-end
