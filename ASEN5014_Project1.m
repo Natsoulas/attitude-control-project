@@ -160,6 +160,7 @@ end
 %problem 2 plot parameter
 plot_2 = 0;
 
+% Simulate the system response
 for i = 1:6
     x0{i} = Q(:,i);
     t = [0:0.01:75]';
@@ -478,8 +479,13 @@ if plot_energy == 1
 end
 
 %% Problem 5
+% (20 pts)
+% Construct an input gain matrix F such that reference inputs are accurately tracked by the corresponding outputs at low frequency.
+% Simulate the response of the closed loop system to a unit step input (one input at a time if there are multiple inputs).
+% Discuss the behavior of the step response relative to the closed loop state matrix eigenvalues.
+
 % Plot parameter for problem 5
-plot_5 = 1;
+plot_5 = 0;
 
 % For reference tracking, we need to ensure that the steady-state output
 % matches the reference input for the quaternion components (q1, q2, q3)
@@ -536,11 +542,10 @@ if plot_5 == 1
         grid on
     end
 
-    % Add combined step response
-    % Create combined step input (q1 and q2 simultaneously)
+    % Create sequential step inputs
     r = zeros(3, length(t));
-    r(1,:) = ones(1,length(t));  % Step in q1
-    r(2,:) = 0.5*ones(1,length(t));  % Smaller step in q2 for demonstration
+    r(1, t >= 0) = ones(1, sum(t >= 0));  % Step in q1 at t=0
+    r(2, t >= 25) = 0.5*ones(1, sum(t >= 25));  % Step in q2 at t=25
     
     % Simulate system response
     [y, t, x] = lsim(sys_tracking, r', t, zeros(6,1));
