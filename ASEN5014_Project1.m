@@ -151,6 +151,12 @@ for i = 1:length(Eig_val)
     end
 end
 
+% Print minimum energy for each mode (with units of N⋅m²⋅s):
+fprintf('\nMinimum Energy for Each Mode:\n');
+for i = 1:6
+    fprintf('Mode %d: %.2e\n', i, E(i));
+end
+
 %problem 2 plot parameter
 plot_2 = 0;
 
@@ -452,13 +458,23 @@ for i = 1:6
     energies.feedback(i) = trapz(t, sum(u_cl_all{i}.^2, 1));
 end
 
+% Plot parameter for energy comparison
+plot_energy = 1;
+
 % Create simple bar plot comparing energies
-figure('Name', 'Control Energy Comparison', 'Position', [100 100 800 400]);
-bar([energies.theoretical; energies.feedback]');
-set(gca, 'YScale', 'log');
-set(gca, 'XTickLabel', mode_names);
-xlabel('Mode');
-ylabel('Control Energy (N⋅m)²⋅s');
-legend('Open Loop Minimum', 'Feedback');
-title('Control Energy Comparison by Mode');
-grid on;
+if plot_energy == 1
+    figure('Name', 'Control Energy Comparison', 'Position', [100 100 800 400]);
+    bar([energies.theoretical; energies.feedback]');
+    set(gca, 'YScale', 'log');
+    set(gca, 'XTickLabel', mode_names);
+    xlabel('Mode');
+    ylabel('Control Energy (N⋅m)²⋅s');
+    legend('Open Loop Minimum', 'Feedback');
+    title('Control Energy Comparison by Mode');
+    grid on;
+
+    % save figure
+    saveas(gcf, '../figures/problem4_energy_comparison.png')
+end
+
+
