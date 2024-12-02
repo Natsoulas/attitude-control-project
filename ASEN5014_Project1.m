@@ -459,7 +459,7 @@ for i = 1:6
 end
 
 % Plot parameter for energy comparison
-plot_energy = 1;
+plot_energy = 0;
 
 % Create simple bar plot comparing energies
 if plot_energy == 1
@@ -477,4 +477,123 @@ if plot_energy == 1
     saveas(gcf, '../figures/problem4_energy_comparison.png')
 end
 
+%% Problem 5
+% Plot parameter for problem 5
+plot_5 = 1;
+
+% For reference tracking, we need to ensure that the steady-state output
+% matches the reference input for the quaternion components (q1, q2, q3)
+
+% Select quaternion outputs for tracking (first 3 states)
+C_track = C(1:3,:);  % Take first 3 rows (q1, q2, q3)
+D_track = D(1:3,:);  % Take first 3 rows
+
+% Calculate F using steady-state tracking condition
+% For step reference tracking: y(∞) = -C(A-BK)^(-1)BF*r = r
+% Therefore: F = -(C(A-BK)^(-1)B)^(-1)
+Acl = A - B*K;  % Closed-loop A matrix from Problem 4
+F = -inv(C_track*inv(Acl)*B);  % Input gain matrix for tracking
+
+% Create augmented closed-loop system with reference input
+sys_tracking = ss(Acl, B*F, C, D*F);
+
+% Time vector for simulation
+t = 0:0.01:75;
+
+% Initialize plots
+if plot_5 == 1
+    figure('Position', [100 100 1200 1000])  % Made taller to accommodate extra subplot
+    sgtitle('Step Response Analysis')
+
+    % First simulate individual step responses
+    for i = 1:3  
+        % Create step input (one channel at a time)
+        r = zeros(3, length(t));
+        r(i,:) = ones(1,length(t));
+        
+        % Simulate system response
+        [y, t, x] = lsim(sys_tracking, r', t, zeros(6,1));
+        u = -K*x' + F*r;  % Total control input (feedback + feedforward)
+        
+        % Plot states
+        subplot(4,2,2*i-1)
+        plot(t, y(:,1:3), 'LineWidth', 1.5)  % Plot quaternions
+        hold on
+        plot(t, r(i,:), 'k--', 'LineWidth', 1.5)  % Plot reference
+        title(sprintf('Quaternion Response - Step in q_%d', i))
+        xlabel('Time (s)')
+        ylabel('Quaternion Value')
+        legend('q1', 'q2', 'q3', 'Reference')
+        grid on
+        
+        % Plot control signals
+        subplot(4,2,2*i)
+        plot(t, u', 'LineWidth', 1.5)
+        title(sprintf('Control Signals - Step in q_%d', i))
+        xlabel('Time (s)')
+        ylabel('Control Torque (N⋅m)')
+        legend('\tau_1', '\tau_2', '\tau_3')
+        grid on
+    end
+
+    % Add combined step response
+    % Create combined step input (q1 and q2 simultaneously)
+    r = zeros(3, length(t));
+    r(1,:) = ones(1,length(t));  % Step in q1
+    r(2,:) = 0.5*ones(1,length(t));  % Smaller step in q2 for demonstration
+    
+    % Simulate system response
+    [y, t, x] = lsim(sys_tracking, r', t, zeros(6,1));
+    u = -K*x' + F*r;  % Total control input (feedback + feedforward)
+    
+    % Plot states
+    subplot(4,2,7)
+    plot(t, y(:,1:3), 'LineWidth', 1.5)  % Plot quaternions
+    hold on
+    plot(t, r(1,:), 'k--', 'LineWidth', 1.5)  % Plot q1 reference
+    plot(t, r(2,:), 'r--', 'LineWidth', 1.5)  % Plot q2 reference
+    title('Quaternion Response - Combined Step')
+    xlabel('Time (s)')
+    ylabel('Quaternion Value')
+    legend('q1', 'q2', 'q3', 'q1 ref', 'q2 ref')
+    grid on
+    
+    % Plot control signals
+    subplot(4,2,8)
+    plot(t, u', 'LineWidth', 1.5)
+    title('Control Signals - Combined Step')
+    xlabel('Time (s)')
+    ylabel('Control Torque (N⋅m)')
+    legend('\tau_1', '\tau_2', '\tau_3')
+    grid on
+
+    % Save figure
+    saveas(gcf, '../figures/problem5_step_response.png')
+end
+
+% Calculate and display steady-state errors
+fprintf('\nSteady-State Analysis:\n')
+for i = 1:3
+    r = zeros(3,1);
+    r(i) = 1;
+    
+    % Calculate theoretical steady state
+    x_ss = -inv(Acl)*B*F*r;
+    y_ss = C_track*x_ss;
+    
+    fprintf('\nStep in q%d:\n', i)
+    fprintf('Steady-state error in q%d: %.2e\n', i, abs(y_ss(i) - 1))
+    for j = 1:3
+        if j ~= i
+            fprintf('Steady-state coupling to q%d: %.2e\n', j, abs(y_ss(j)))
+        end
+    end
+end
+
+% Analysis of step response vs eigenvalues
+fprintf('\nStep Response Analysis:\n')
+fprintf('Rise time corresponds to faster eigenvalues (%.2f, %.2f, %.2f)\n', ...
+    desired_eigs(1), desired_eigs(2), desired_eigs(3))
+fprintf('Settling time dominated by slower eigenvalues (%.2f, %.2f, %.2f)\n', ...
+    desired_eigs(4), desired_eigs(5), desired_eigs(6))
 
