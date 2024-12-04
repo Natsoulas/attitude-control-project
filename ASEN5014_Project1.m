@@ -121,8 +121,8 @@ end
 
 %% Problem 2
 %reachability
-U = [B, A*B, (A^2)*B, (A^3)*B, (A^4)*B, (A^5)*B];
-U_rank = rank(U);
+P = [B, A*B, (A^2)*B, (A^3)*B, (A^4)*B, (A^5)*B];
+P_rank = rank(P);
 %reachable subspace of the state space is R6
 
 %orthonormal basis Q for R6
@@ -138,14 +138,14 @@ the state to the equilibrium at zero from unit-perturbations in each of
 the orthonormal basis vector directions for the reachable subspace.
 %}
 x_final = [0;0;0;0;0;0];
-W = zeros(6,6);
+G = zeros(6,6);
 for i =1:length(t)
-    W = W + dt*(expm(A*(-t(i)))*B*B'*expm(A'*(-t(i))));
+    G = G + dt*(expm(A*(-t(i)))*B*B'*expm(A'*(-t(i))));
 end
 for i = 1:length(Eig_val)
     zeta(:,i) = expm(-A*(t(end)-t(1)))*x_final - Q(:,i);
-    E(i) = zeta(:,i)'*inv(W)*zeta(:,i);
-    v(:,i) = W\zeta(:,i);
+    E(i) = zeta(:,i)'*inv(G)*zeta(:,i);
+    v(:,i) = G\zeta(:,i);
     for j = 1:length(t)
         u_t{i}(j,:) = [B'*expm(-A'*(t(j)-t(1)))*v(:,i)]';
     end
@@ -306,12 +306,12 @@ for i = 1:6
     u_cl_all{i} = -K * x_cl';  % Feedback control signal
     
     % Open-loop minimum energy control
-    W = zeros(6,6);
+    G = zeros(6,6);
     for j = 1:length(t)
-        W = W + 0.01*(expm(A*(-t(j)))*B*B'*expm(A'*(-t(j))));
+        G = G + 0.01*(expm(A*(-t(j)))*B*B'*expm(A'*(-t(j))));
     end
     zeta = expm(-A*(t(end)-t(1)))*zeros(6,1) - x0;
-    v = W\zeta;
+    v = G\zeta;
     u_ol = zeros(3, length(t));
     for j = 1:length(t)
         u_ol(:,j) = B'*expm(-A'*(t(j)-t(1)))*v;
@@ -442,9 +442,9 @@ mode_names = {'ω1', 'ω2', 'ω3', 'q1', 'q2', 'q3'};
 energies = struct();
 
 % Calculate controllability Gramian W
-W = zeros(6,6);
+G = zeros(6,6);
 for i = 1:length(t)
-    W = W + dt*(expm(A*(-t(i)))*B*B'*expm(A'*(-t(i))));
+    G = G + dt*(expm(A*(-t(i)))*B*B'*expm(A'*(-t(i))));
 end
 
 % Calculate energies for each mode
@@ -453,7 +453,7 @@ for i = 1:6
     
     % Theoretical open loop minimum energy
     zeta = expm(-A*(t(end)-t(1)))*zeros(6,1) - x0;
-    energies.theoretical(i) = zeta'*inv(W)*zeta;
+    energies.theoretical(i) = zeta'*inv(G)*zeta;
     
     % Actual feedback energy used
     energies.feedback(i) = trapz(t, sum(u_cl_all{i}.^2, 1));
@@ -485,7 +485,7 @@ end
 % Discuss the behavior of the step response relative to the closed loop state matrix eigenvalues.
 
 % Plot parameter for problem 5
-plot_5 = 0;
+plot_5 = 1;
 
 % For reference tracking, we need to ensure that the steady-state output
 % matches the reference input for the quaternion components (q1, q2, q3)
@@ -498,7 +498,7 @@ D_track = D(1:3,:);  % Take first 3 rows
 % For step reference tracking: y(∞) = -C(A-BK)^(-1)BF*r = r
 % Therefore: F = -(C(A-BK)^(-1)B)^(-1)
 Acl = A - B*K;  % Closed-loop A matrix from Problem 4
-F = -inv(C_track*inv(Acl)*B);  % Input gain matrix for tracking
+F = inv(C_track*inv(-Acl)*B);  % Input gain matrix for tracking
 
 % Create augmented closed-loop system with reference input
 sys_tracking = ss(Acl, B*F, C, D*F);
