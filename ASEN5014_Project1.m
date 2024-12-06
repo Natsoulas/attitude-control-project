@@ -267,11 +267,11 @@ sys_cl = ss(Acl, B, C, D);
 
 % Verify eigenvalues and eigenvectors
 [V_cl, D_cl] = eig(Acl);
-[eigs, idx] = sort(diag(D_cl), 'ComparisonMethod', 'real');  % Sort by real part
+[eigvals, idx] = sort(diag(D_cl), 'ComparisonMethod', 'real');  % Sort by real part
 V_cl = V_cl(:,idx);
 
 fprintf('\nFinal closed-loop eigenvalues:\n')
-disp(eigs)
+disp(eigvals)
 
 % Time vector for simulation
 t = 0:0.001:75;
@@ -485,7 +485,7 @@ end
 % Discuss the behavior of the step response relative to the closed loop state matrix eigenvalues.
 
 % Plot parameter for problem 5
-plot_5 = 1;
+plot_5 = 0;
 
 % For reference tracking, we need to ensure that the steady-state output
 % matches the reference input for the quaternion components (q1, q2, q3)
@@ -573,7 +573,7 @@ if plot_5 == 1
     grid on
 
     % Save figure
-    saveas(gcf, '../figures/problem5_step_response.png')
+    %saveas(gcf, '../figures/problem5_step_response.png')
 end
 
 % Calculate and display steady-state errors
@@ -601,4 +601,268 @@ fprintf('Rise time corresponds to faster eigenvalues (%.2f, %.2f, %.2f)\n', ...
     desired_eigs(1), desired_eigs(2), desired_eigs(3))
 fprintf('Settling time dominated by slower eigenvalues (%.2f, %.2f, %.2f)\n', ...
     desired_eigs(4), desired_eigs(5), desired_eigs(6))
+
+%% Project 2 P1
+
+%ANALYSIS PROBABLY NEEDS TO BE ON A NOT Acl, update
+O = [];
+for i = 1:size(Acl,1)
+    O = [O;C*(Acl^(i-1))];
+end
+O_rank = rank(O);
+O_RN = null(Acl);
+%The rank of the observability matrix O is 6=n, therefore all x within R6
+%are observable. The RN of Acl is trivial, containing only the zero vector.
+
+%observability grammian
+OG = zeros(6,6);
+for i =1:length(t)
+    OG = OG + dt*(expm(Acl*(t(i)))*C*C'*expm(Acl'*(t(i))));
+end
+[OG_eigvec,OG_eigval] = eigs(OG);
+%small eigvals of OG, less observable states
+
+%energy in output signal from t0 to t1, each modal space unit ICs
+for i = 1:length(Eig_val)
+    E_y(i) = Q(:,i)'*OG*Q(:,i);
+end
+%All modes can be changed in an observer designed around the plant dynamics
+%as all modes in the plant system are observable? (need to verify)
+
+%% Project 2 P2
+%Luenberger observer slow
+desired_eigs_L_slow = -desired_eigs/5;
+L_slow = [place(A',C',desired_eigs_L_slow)]';
+%Luenberger observer equal
+desired_eigs_L_eq = -desired_eigs;
+%[-0.1001;-0.1002;-0.1003;-0.2001;-0.2002;-0.2003];
+L_eq = [place(A',C',desired_eigs_L_eq)]';
+%Luenberger observer fast 
+desired_eigs_L_fast = -5*desired_eigs;
+L_fast = [place(A',C',desired_eigs_L_fast)]';
+
+%% Project 2 P3
+%Luenberger ss matrices
+AL_slow = [Acl,B*K;zeros(6,6),L_slow];
+AL_equal = [Acl,B*K;zeros(6,6),L_eq];
+AL_fast = [Acl,B*K;zeros(6,6),L_fast];
+BL = [B*F;zeros(6,3)];
+
+%L_slow: set integration time, ICs, ODE call, and plots
+slowplot = 1;
+if slowplot == 1
+t = 0:0.01:600;
+
+x0_test = zeros(6,1);
+x0hat_test = zeros(6,1);
+for i = 1:3
+    r = zeros(3,1);
+    r(i) = 1;
+    e0_test = x0_test - x0hat_test;
+    [ttest{i},xtest{i}] = ode45(@(t,x) CL_Luenberger(t,x,r,L_slow,Acl,B,K,F),t,[x0_test;e0_test]);
+    xhattest{i} = xtest{i}(:,1:6)-xtest{i}(:,7:12);
+
+    figure ()
+    plot(ttest{i},xtest{i}(:,1),'k')
+    hold on
+    plot(ttest{i},xtest{i}(:,2),'k')
+    plot(ttest{i},xtest{i}(:,3),'k')
+    plot(ttest{i},xhattest{i}(:,1),'r')
+    plot(ttest{i},xhattest{i}(:,2),'r')
+    plot(ttest{i},xhattest{i}(:,3),'r')
+    hold off
+
+    figure ()
+    plot(ttest{i},xtest{i}(:,4),'k')
+    hold on
+    plot(ttest{i},xtest{i}(:,5),'k')
+    plot(ttest{i},xtest{i}(:,6),'k')
+    plot(ttest{i},xhattest{i}(:,4),'r')
+    plot(ttest{i},xhattest{i}(:,5),'r')
+    plot(ttest{i},xhattest{i}(:,6),'r')
+    hold off
+end
+end
+
+%L_eq: set integration time, ICs, ODE call, and plots
+eqplot = 0;
+if eqplot == 1
+t = 0:0.01:400;
+
+r = zeros(3,1);
+x0hat_test = zeros(6,1);
+for i = 1:6
+    x0_test = zeros(6,1);
+    x0_test(i) = 1;
+    e0_test = x0_test - x0hat_test;
+    [ttest{i},xtest{i}] = ode45(@(t,x) CL_Luenberger(t,x,r,L_eq,Acl,B,K,F),t,[x0_test;e0_test]);
+    xhattest{i} = xtest{i}(:,1:6)-xtest{i}(:,7:12);
+
+    figure ()
+    plot(ttest{i},xtest{i}(:,1),'k')
+    hold on
+    plot(ttest{i},xtest{i}(:,2),'k')
+    plot(ttest{i},xtest{i}(:,3),'k')
+    plot(ttest{i},xhattest{i}(:,1),'r')
+    plot(ttest{i},xhattest{i}(:,2),'r')
+    plot(ttest{i},xhattest{i}(:,3),'r')
+    hold off
+
+    figure ()
+    plot(ttest{i},xtest{i}(:,4),'k')
+    hold on
+    plot(ttest{i},xtest{i}(:,5),'k')
+    plot(ttest{i},xtest{i}(:,6),'k')
+    plot(ttest{i},xhattest{i}(:,4),'r')
+    plot(ttest{i},xhattest{i}(:,5),'r')
+    plot(ttest{i},xhattest{i}(:,6),'r')
+    hold off
+end
+end
+
+%L_fast: set integration time, ICs, ODE call, and plots
+fastplot = 1;
+if fastplot == 1
+t = 0:0.01:200;
+
+r = zeros(3,1);
+x0hat_test = zeros(6,1);
+for i = 1:6
+    x0_test = zeros(6,1);
+    x0_test(i) = 1;
+    e0_test = x0_test - x0hat_test;
+    [ttest{i},xtest{i}] = ode45(@(t,x) CL_Luenberger(t,x,r,L_fast,Acl,B,K,F),t,[x0_test;e0_test]);
+    xhattest{i} = xtest{i}(:,1:6)-xtest{i}(:,7:12);
+
+    figure ()
+    plot(ttest{i},xtest{i}(:,1),'k')
+    hold on
+    plot(ttest{i},xtest{i}(:,2),'k')
+    plot(ttest{i},xtest{i}(:,3),'k')
+    plot(ttest{i},xhattest{i}(:,1),'r')
+    plot(ttest{i},xhattest{i}(:,2),'r')
+    plot(ttest{i},xhattest{i}(:,3),'r')
+    hold off
+
+    figure ()
+    plot(ttest{i},xtest{i}(:,4),'k')
+    hold on
+    plot(ttest{i},xtest{i}(:,5),'k')
+    plot(ttest{i},xtest{i}(:,6),'k')
+    plot(ttest{i},xhattest{i}(:,4),'r')
+    plot(ttest{i},xhattest{i}(:,5),'r')
+    plot(ttest{i},xhattest{i}(:,6),'r')
+    hold off
+end
+end
+
+%% Project 2 P4
+%L_slow: set integration time, ICs, ODE call, and plots
+slowplot = 1;
+if slowplot == 1
+t = 0:0.01:600;
+
+r = zeros(3,1);
+x0hat_test = zeros(6,1);
+for i = 1:6
+    x0_test = zeros(6,1);
+    x0_test(i) = 1;
+    e0_test = x0_test - x0hat_test;
+    [ttest{i},xtest{i}] = ode45(@(t,x) CL_Luenberger(t,x,r,L_slow,Acl,B,K,F),t,[x0_test;e0_test]);
+    xhattest{i} = xtest{i}(:,1:6)-xtest{i}(:,7:12);
+
+    figure ()
+    plot(ttest{i},xtest{i}(:,1),'k')
+    hold on
+    plot(ttest{i},xtest{i}(:,2),'k')
+    plot(ttest{i},xtest{i}(:,3),'k')
+    plot(ttest{i},xhattest{i}(:,1),'r')
+    plot(ttest{i},xhattest{i}(:,2),'r')
+    plot(ttest{i},xhattest{i}(:,3),'r')
+    hold off
+
+    figure ()
+    plot(ttest{i},xtest{i}(:,4),'k')
+    hold on
+    plot(ttest{i},xtest{i}(:,5),'k')
+    plot(ttest{i},xtest{i}(:,6),'k')
+    plot(ttest{i},xhattest{i}(:,4),'r')
+    plot(ttest{i},xhattest{i}(:,5),'r')
+    plot(ttest{i},xhattest{i}(:,6),'r')
+    hold off
+end
+end
+
+%L_eq: set integration time, ICs, ODE call, and plots
+eqplot = 0;
+if eqplot == 1
+t = 0:0.01:400;
+
+r = zeros(3,1);
+x0hat_test = zeros(6,1);
+for i = 1:6
+    x0_test = zeros(6,1);
+    x0_test(i) = 1;
+    e0_test = x0_test - x0hat_test;
+    [ttest{i},xtest{i}] = ode45(@(t,x) CL_Luenberger(t,x,r,L_eq,Acl,B,K,F),t,[x0_test;e0_test]);
+    xhattest{i} = xtest{i}(:,1:6)-xtest{i}(:,7:12);
+
+    figure ()
+    plot(ttest{i},xtest{i}(:,1),'k')
+    hold on
+    plot(ttest{i},xtest{i}(:,2),'k')
+    plot(ttest{i},xtest{i}(:,3),'k')
+    plot(ttest{i},xhattest{i}(:,1),'r')
+    plot(ttest{i},xhattest{i}(:,2),'r')
+    plot(ttest{i},xhattest{i}(:,3),'r')
+    hold off
+
+    figure ()
+    plot(ttest{i},xtest{i}(:,4),'k')
+    hold on
+    plot(ttest{i},xtest{i}(:,5),'k')
+    plot(ttest{i},xtest{i}(:,6),'k')
+    plot(ttest{i},xhattest{i}(:,4),'r')
+    plot(ttest{i},xhattest{i}(:,5),'r')
+    plot(ttest{i},xhattest{i}(:,6),'r')
+    hold off
+end
+end
+
+%L_fast: set integration time, ICs, ODE call, and plots
+fastplot = 0;
+if fastplot == 1
+t = 0:0.01:200;
+
+r = zeros(3,1);
+x0hat_test = zeros(6,1);
+for i = 1:6
+    x0_test = zeros(6,1);
+    x0_test(i) = 1;
+    e0_test = x0_test - x0hat_test;
+    [ttest{i},xtest{i}] = ode45(@(t,x) CL_Luenberger(t,x,r,L_fast,Acl,B,K,F),t,[x0_test;e0_test]);
+    xhattest{i} = xtest{i}(:,1:6)-xtest{i}(:,7:12);
+
+    figure ()
+    plot(ttest{i},xtest{i}(:,1),'k')
+    hold on
+    plot(ttest{i},xtest{i}(:,2),'k')
+    plot(ttest{i},xtest{i}(:,3),'k')
+    plot(ttest{i},xhattest{i}(:,1),'r')
+    plot(ttest{i},xhattest{i}(:,2),'r')
+    plot(ttest{i},xhattest{i}(:,3),'r')
+    hold off
+
+    figure ()
+    plot(ttest{i},xtest{i}(:,4),'k')
+    hold on
+    plot(ttest{i},xtest{i}(:,5),'k')
+    plot(ttest{i},xtest{i}(:,6),'k')
+    plot(ttest{i},xhattest{i}(:,4),'r')
+    plot(ttest{i},xhattest{i}(:,5),'r')
+    plot(ttest{i},xhattest{i}(:,6),'r')
+    hold off
+end
+end
+
 
